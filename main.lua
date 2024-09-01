@@ -11,7 +11,7 @@
 
 	BREAKDOWN										  NAME 										CODE
 	
-	-- Floating-point precision values.
+	-- Floating-point precision values. (BTW: GitHub might mess up the presentation below!)
 		   Integer						  Precision
 	|	|			|								| Half Precision Floating Point 			"f16"
 Sign  15  14	 10  9							  0	  (16 bits)	
@@ -19,7 +19,7 @@ Sign  15  14	 10  9							  0	  (16 bits)
 Sign  31  30	 23  22							  0	  (32 bits)
 	|	|			|								| Double Precision Floating Point 			"f64"
 Sign  63  62	 52  51							  0	  (64 bits)	
-			    	  v-> *Integer bit
+			    	   v-> *Integer bit
 	|	|			|	|							| Double Extended Precision Floating Point 	"f80"
 Sign  79  78	 64  63  62						  0	  (64 bits)	
 
