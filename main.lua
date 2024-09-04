@@ -19,7 +19,7 @@ Sign  15  14	 10  9							  0	  (16 bits)
 Sign  31  30	 23  22							  0	  (32 bits)
 	|	|			|								| Double Precision Floating Point 			"f64"
 Sign  63  62	 52  51							  0	  (64 bits)	
-			    	   v-> *Integer bit
+			    	    v-> *Integer bit
 	|	|			|	|							| Double Extended Precision Floating Point 	"f80"
 Sign  79  78	 64  63  62						  0	  (64 bits)	
 
@@ -80,18 +80,33 @@ function frac_tobase(n,b)
 	return frac
 end
 
--- The float conversion function itself.
-return function(value:number,precision)
-	assert(precision,"Missing precision for float conversion")
+-- The float conversion functions. One to convert into the binary and one to recover values from the format.
+local float = {}
+function float.tofloat(value:number,precision:number)
+	local sign = "0"
+	if 0>value then value=-value sign = "1" end 
 	
-	local returnvalue = value
+	local bias = if precision==16 then 15 elseif precision==32 then 127 elseif precision==64 then 1023 else 2047 --Else: Extended Double Precision
+	local expolen = if precision==16 then 6 elseif precision==32 then 8 elseif precision==64 then 11 else 15
+	local matissalen = if precision==10 then 10 elseif precision==32 then 23 elseif precision==64 then 52 else 63
+
+	local value = realval(value) -- *Real* value. Since Lua tends to use the negative exponentiation at very long fractions, this conversion is done.
+	local fractioned = tonumber("0"..string.sub(tostring(value),#tostring(math.floor(tonumber(value)))+1,#tostring(value))) -- Fixed fraction value
+	local matissa = string.sub(toBinary(math.floor(tonumber(value)))..frac_tobase(fractioned,2),2);matissa..=string.rep("0",matissalen-#matissa) -- Matissa/Fraction. Whatever you may call it
+	matissa=if matissa:sub(matissalen+1,matissalen+1)=="1" then string.sub(matissa,1,matissalen-2).."10" else string.sub(matissa,1,matissalen-2).."00" -- Mysterious IEEE-754 roundup/down feature. To make numbers even less accurate who knows.
+	local expo = string.format("%0"..expolen.."s",toBinary(bias+(((function() local amnt = 0 if tostring(value):split(".")[2] then for i,v in pairs(tostring(value):split(".")[2]:split("")) do if tonumber(v) and tonumber(v)==0 then amnt+=1 end end end return amnt end)())>0 and -#frac_tobase(fractioned,2):split("1")[1]-1 or #toBinary(math.floor(tonumber(value)),2)-1)))
+	return sign .. expo .. matissa
+end
+function float.unfloat(value:string,precision:number,newnum)
+	value = tostring(value)
 	local bias = if precision==16 then 15 elseif precision==32 then 127 elseif precision==64 then 1023 else 2047 --Else: Extended Double Precision
 	local expolen = if precision==16 then 6 elseif precision==32 then 8 elseif precision==64 then 11 else 15
 	local matissalen = if precision==10 then 10 elseif precision==32 then 23 elseif precision==64 then 52 else 63
 	
-	local value = realval(value) -- *Real* value. Since Lua tends to use the negative exponentiation at very long fractions, this conversion is done.
-	local fractioned = tonumber("0"..string.sub(tostring(value),#tostring(math.floor(tonumber(value)))+1,#tostring(value))) -- Fixed fraction value
-	local matissa = string.sub(toBinary(math.floor(tonumber(value)))..frac_tobase(fractioned,2),2);matissa..=string.rep("0",matissalen-#matissa) -- Matissa/Fraction. Whatever you may call it
-	matissa=if matissa:sub(matissalen+1,matissalen+1)=="1" then string.sub(matissa,1,matissalen-2).."10" else string.sub(matissa,1,matissalen-2).."00" -- Mysterious IEEE-754 roundup/down feature. To make numbers even less accurate who knows?
-	return (if tonumber(value)>0 then "0" else "1")..string.format("%0"..expolen.."s",toBinary(bias+(((function() local amnt = 0 if tostring(value):split(".")[2] then for i,v in pairs(tostring(value):split(".")[2]:split("")) do if tonumber(v) and tonumber(v)==0 then amnt+=1 end end end return amnt end)())>0 and -#frac_tobase(fractioned,2):split("1")[1]-1 or #toBinary(math.floor(tonumber(value)),2)-1),2)).. matissa
+	local tolling=unbin(value:sub(2,1+expolen))-bias --Tolling to undo the shifting within the exponent.
+	local v1,v2 = value:sub(1+expolen,1+expolen+tolling),value:sub(1+expolen+tolling+1,#value)
+	local mantissa = tostring(frac_unbin(v2)):sub(3) 
+	return (value:sub(1,1)=="1" and "-" or "") .. (math.floor(tonumber(unbin(v1)+(if table.pack(math.modf(#v1/2))[2]==0 then (2^(#v1-1)) else 0)))) .. (mantissa=="" and mantissa or "." .. mantissa)
 end
+
+return float
